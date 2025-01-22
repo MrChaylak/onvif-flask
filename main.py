@@ -1,8 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from wsdiscovery.discovery import ThreadedWSDiscovery as WSDiscovery
 from wsdiscovery import Scope
 import re
+from onvif import ONVIFCamera
 
 app = Flask(__name__)
 
@@ -56,6 +57,44 @@ def get_onvif_devices():
     devices = fetch_devices()
     print(devices)
     return jsonify({'devices': devices})
+
+
+@app.route('/api/onvif-camera-data', methods=['POST'])
+def get_onvif_camera_data():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+
+    if not ip or not username or not password:
+        return jsonify({'error': 'IP, username, and password are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Get device information
+        device_info = camera.devicemgmt.GetDeviceInformation()
+
+        # Get media profiles
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+
+        # Return the data
+        return jsonify({
+            'device_info': {
+                'manufacturer': device_info.Manufacturer,
+                'model': device_info.Model,
+                'firmware_version': device_info.FirmwareVersion,
+                'serial_number': device_info.SerialNumber,
+            },
+            'profiles': [{
+                'name': profile.Name,
+                'token': profile.token,
+            } for profile in profiles],
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
