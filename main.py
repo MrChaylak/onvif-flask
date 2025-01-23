@@ -147,5 +147,44 @@ def get_onvif_camera_data():
             return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/set-onvif-camera-profile', methods=['POST'])
+def set_onvif_camera_profile():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+    profile_token = data.get('profileToken')
+
+    if not ip or not username or not password or not profile_token:
+        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Get the media service
+        media_service = camera.create_media_service()
+
+        # Get the stream URI for the selected profile
+        stream_uri = media_service.GetStreamUri({
+            'StreamSetup': {
+                'Stream': 'RTP-Unicast',  # Use RTP-Unicast or RTP-Multicast
+                'Transport': {
+                    'Protocol': 'RTSP'  # Use RTSP, HTTP, or HTTPS
+                }
+            },
+            'ProfileToken': profile_token,
+        })
+
+        return jsonify({
+            'message': 'Stream URI fetched successfully',
+            'stream_uri': stream_uri.Uri
+        })
+    except Exception as e:
+        print(f"Error fetching stream URI for profile {profile_token}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
