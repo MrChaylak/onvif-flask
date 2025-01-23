@@ -185,6 +185,77 @@ def set_onvif_camera_profile():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/ptz-move', methods=['POST'])
+def ptz_move():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+    profile_token = data.get('profileToken')
+    pan_speed = data.get('panSpeed', 0.0)  # Default to 0.0 if not provided
+    tilt_speed = data.get('tiltSpeed', 0.0)  # Default to 0.0 if not provided
+    zoom_speed = data.get('zoomSpeed', 0.0)  # Default to 0.0 if not provided
+
+    if not ip or not username or not password or not profile_token:
+        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create PTZ service
+        ptz_service = camera.create_ptz_service()
+
+        # Send ContinuousMove command
+        move_request = ptz_service.create_type('ContinuousMove')
+        move_request.ProfileToken = profile_token
+        move_request.Velocity = {
+            'PanTilt': {
+                'x': pan_speed,  # Pan speed (-1.0 to 1.0)
+                'y': tilt_speed  # Tilt speed (-1.0 to 1.0)
+            },
+            'Zoom': {
+                'x': zoom_speed  # Zoom speed (-1.0 to 1.0)
+            }
+        }
+        ptz_service.ContinuousMove(move_request)
+
+        return jsonify({'message': 'PTZ movement started successfully'})
+    except Exception as e:
+        print(f"Error performing PTZ movement: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/ptz-stop', methods=['POST'])
+def ptz_stop():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+    profile_token = data.get('profileToken')
+
+    if not ip or not username or not password or not profile_token:
+        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create PTZ service
+        ptz_service = camera.create_ptz_service()
+
+        # Send Stop command
+        stop_request = ptz_service.create_type('Stop')
+        stop_request.ProfileToken = profile_token
+        stop_request.PanTilt = True  # Stop pan/tilt
+        stop_request.Zoom = True  # Stop zoom
+        ptz_service.Stop(stop_request)
+
+        return jsonify({'message': 'PTZ movement stopped successfully'})
+    except Exception as e:
+        print(f"Error stopping PTZ movement: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
