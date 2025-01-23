@@ -36,13 +36,13 @@ def fetch_devices():
             ipaddress = re.search(r'(\d+\.\d+\.\d+\.\d+)', xaddrs[0])
             if ipaddress:
                 ipaddresses.append(ipaddress.group(0))
-                print("START----------")
-                print(f"IP: {ipaddress.group(0)}")
+                # print("START----------")
+                # print(f"IP: {ipaddress.group(0)}")
 
         # Display device scopes for debugging
-        print("Scopes:")
-        display(service.getScopes())
-        print('------------END')
+        # print("Scopes:")
+        # display(service.getScopes())
+        # print('------------END')
 
     print(f'\nNumber of devices detected: {len(services)}')
 
@@ -138,7 +138,13 @@ def get_onvif_camera_data():
             'camera_running': camera_running,
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Handle specific authentication errors
+        if "Unauthorized" in str(e) or "401" in str(e):
+            print(f"Authentication failed: Incorrect username or password for camera at {ip}")
+            return jsonify({'error': 'Incorrect username or password'}), 401
+        else:
+            print(f"Error fetching ONVIF camera data: {e}")
+            return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
