@@ -80,6 +80,50 @@ def get_onvif_camera_data():
         media_service = camera.create_media_service()
         profiles = media_service.GetProfiles()
 
+        # Check if PTZ is available
+        ptz_available = False
+        try:
+            ptz_service = camera.create_ptz_service()
+            ptz_configurations = ptz_service.GetConfigurations()
+            ptz_available = len(ptz_configurations) > 0
+        except Exception as ptz_error:
+            print(f"PTZ not available: {ptz_error}")
+
+        # Check if the camera is running (e.g., by fetching the system date and time)
+        camera_running = False
+        try:
+            system_date_time = camera.devicemgmt.GetSystemDateAndTime()
+            camera_running = True
+        except Exception as system_error:
+            print(f"Camera not running: {system_error}")
+
+        # Get encoder details for each profile
+        profile_details = []
+        for profile in profiles:
+            try:
+                # Get the video encoder configuration for the profile
+                encoder_config = media_service.GetVideoEncoderConfiguration({
+                    'ConfigurationToken': profile.VideoEncoderConfiguration.token
+                })
+                profile_details.append({
+                    'name': profile.Name,
+                    'token': profile.token,
+                    'encoder': encoder_config.Encoding,  # H.264, H.265, etc.
+                    'resolution': f"{encoder_config.Resolution.Width}x{encoder_config.Resolution.Height}",
+                    'frame_rate': encoder_config.RateControl.FrameRateLimit,
+                    'bitrate': encoder_config.RateControl.BitrateLimit,
+                })
+            except Exception as encoder_error:
+                print(f"Failed to fetch encoder details for profile {profile.Name}: {encoder_error}")
+                profile_details.append({
+                    'name': profile.Name,
+                    'token': profile.token,
+                    'encoder': 'Unknown',
+                    'resolution': 'Unknown',
+                    'frame_rate': 'Unknown',
+                    'bitrate': 'Unknown',
+                })
+
         # Return the data
         return jsonify({
             'device_info': {
@@ -87,11 +131,11 @@ def get_onvif_camera_data():
                 'model': device_info.Model,
                 'firmware_version': device_info.FirmwareVersion,
                 'serial_number': device_info.SerialNumber,
+                'hardware_id': device_info.HardwareId,
             },
-            'profiles': [{
-                'name': profile.Name,
-                'token': profile.token,
-            } for profile in profiles],
+            'profiles': profile_details,
+            'ptz_available': ptz_available,
+            'camera_running': camera_running,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
