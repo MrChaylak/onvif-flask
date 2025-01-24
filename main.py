@@ -4,6 +4,10 @@ from wsdiscovery.discovery import ThreadedWSDiscovery as WSDiscovery
 from wsdiscovery import Scope
 import re
 from onvif import ONVIFCamera
+import logging
+
+# Suppress warnings from the daemon logger
+logging.getLogger('daemon').setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
@@ -91,11 +95,22 @@ def get_onvif_camera_data():
 
         # Check if the camera is running (e.g., by fetching the system date and time)
         camera_running = False
+        system_date_time = None
         try:
             system_date_time = camera.devicemgmt.GetSystemDateAndTime()
             camera_running = True
         except Exception as system_error:
             print(f"Camera not running: {system_error}")
+
+        # Format the system date and time
+        formatted_date_time = None
+        if system_date_time:
+            utc_date_time = system_date_time.UTCDateTime
+            if utc_date_time:
+                formatted_date_time = (
+                    f"{utc_date_time.Date.Year}-{utc_date_time.Date.Month:02d}-{utc_date_time.Date.Day:02d} "
+                    f"{utc_date_time.Time.Hour:02d}:{utc_date_time.Time.Minute:02d}:{utc_date_time.Time.Second:02d}"
+                )
 
         # Get encoder details for each profile
         profile_details = []
@@ -136,6 +151,7 @@ def get_onvif_camera_data():
             'profiles': profile_details,
             'ptz_available': ptz_available,
             'camera_running': camera_running,
+            'system_date_time': formatted_date_time,  # Include the formatted date and time
         })
     except Exception as e:
         # Handle specific authentication errors
@@ -145,44 +161,6 @@ def get_onvif_camera_data():
         else:
             print(f"Error fetching ONVIF camera data: {e}")
             return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/set-onvif-camera-profile', methods=['POST'])
-def set_onvif_camera_profile():
-    data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
-    profile_token = data.get('profileToken')
-
-    if not ip or not username or not password or not profile_token:
-        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
-
-    try:
-        # Connect to the ONVIF camera
-        camera = ONVIFCamera(ip, 80, username, password)
-
-        # Get the media service
-        media_service = camera.create_media_service()
-
-        # Get the stream URI for the selected profile
-        stream_uri = media_service.GetStreamUri({
-            'StreamSetup': {
-                'Stream': 'RTP-Unicast',  # Use RTP-Unicast or RTP-Multicast
-                'Transport': {
-                    'Protocol': 'RTSP'  # Use RTSP, HTTP, or HTTPS
-                }
-            },
-            'ProfileToken': profile_token,
-        })
-
-        return jsonify({
-            'message': 'Stream URI fetched successfully',
-            'stream_uri': stream_uri.Uri
-        })
-    except Exception as e:
-        print(f"Error fetching stream URI for profile {profile_token}: {e}")
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/ptz-move', methods=['POST'])
@@ -254,6 +232,78 @@ def ptz_stop():
         return jsonify({'message': 'PTZ movement stopped successfully'})
     except Exception as e:
         print(f"Error stopping PTZ movement: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/move-focus-continuous', methods=['POST'])
+def move_focus_continuous():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+    speed = data.get('speed', 0.5)  # Focus speed (-1.0 to 1.0)
+
+    if not ip or not username or not password:
+        return jsonify({'error': 'IP, username, and password are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create Imaging service
+        imaging_service = camera.create_imaging_service()
+
+        # Get the video source token (required for focus control)
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+        video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
+
+        # Move focus continuously
+        imaging_service.Move({
+            'VideoSourceToken': video_source_token,
+            'Focus': {
+                'Continuous': {
+                    'Speed': speed
+                }
+            }
+        })
+
+        return jsonify({'message': 'Continuous focus adjustment started successfully'})
+    except Exception as e:
+        print(f"Error adjusting focus: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/stop-focus', methods=['POST'])
+def stop_focus():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+
+    if not ip or not username or not password:
+        return jsonify({'error': 'IP, username, and password are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create Imaging service
+        imaging_service = camera.create_imaging_service()
+
+        # Get the video source token (required for focus control)
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+        video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
+
+        # Stop focus adjustment
+        imaging_service.Stop({
+            'VideoSourceToken': video_source_token
+        })
+
+        return jsonify({'message': 'Focus adjustment stopped successfully'})
+    except Exception as e:
+        print(f"Error stopping focus: {e}")
         return jsonify({'error': str(e)}), 500
 
 
