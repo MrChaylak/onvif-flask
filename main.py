@@ -231,5 +231,77 @@ def ptz_stop():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/move-focus-continuous', methods=['POST'])
+def move_focus_continuous():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+    speed = data.get('speed', 0.5)  # Focus speed (-1.0 to 1.0)
+
+    if not ip or not username or not password:
+        return jsonify({'error': 'IP, username, and password are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create Imaging service
+        imaging_service = camera.create_imaging_service()
+
+        # Get the video source token (required for focus control)
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+        video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
+
+        # Move focus continuously
+        imaging_service.Move({
+            'VideoSourceToken': video_source_token,
+            'Focus': {
+                'Continuous': {
+                    'Speed': speed
+                }
+            }
+        })
+
+        return jsonify({'message': 'Continuous focus adjustment started successfully'})
+    except Exception as e:
+        print(f"Error adjusting focus: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/stop-focus', methods=['POST'])
+def stop_focus():
+    data = request.json
+    ip = data.get('ip')
+    username = data.get('username')
+    password = data.get('password')
+
+    if not ip or not username or not password:
+        return jsonify({'error': 'IP, username, and password are required'}), 400
+
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create Imaging service
+        imaging_service = camera.create_imaging_service()
+
+        # Get the video source token (required for focus control)
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+        video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
+
+        # Stop focus adjustment
+        imaging_service.Stop({
+            'VideoSourceToken': video_source_token
+        })
+
+        return jsonify({'message': 'Focus adjustment stopped successfully'})
+    except Exception as e:
+        print(f"Error stopping focus: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True)
