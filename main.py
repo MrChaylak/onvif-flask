@@ -4,6 +4,10 @@ from wsdiscovery.discovery import ThreadedWSDiscovery as WSDiscovery
 from wsdiscovery import Scope
 import re
 from onvif import ONVIFCamera
+import logging
+
+# Suppress warnings from the daemon logger
+logging.getLogger('daemon').setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
