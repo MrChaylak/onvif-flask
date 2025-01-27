@@ -4,10 +4,12 @@ With this **Flask** API you can discover and control the Onvif Cameras in your n
 
 ## Table of Contents
 
-- Used Technologies
-- Prerequisites
-- Installation
-- Running the Application
+- [Used Technologies](#used-technologies)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Running the Application](#-running-the-application)
+
+---
 
 ## Used Technologies
 
