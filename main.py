@@ -75,8 +75,12 @@ def get_onvif_camera_data():
     username = data.get('username')
     password = data.get('password')
 
-    if not ip or not username or not password:
-        return jsonify({'error': 'IP, username, and password are required'}), 400
+    if not ip:
+        return jsonify({'error': 'IP is required'}), 400
+    if not username:
+        return jsonify({'error': 'Username is required'}), 401
+    if not password:
+        return jsonify({'error': 'Password is required'}), 401
 
     try:
         # Connect to the ONVIF camera
@@ -131,7 +135,7 @@ def get_onvif_camera_data():
                     'encoder': encoder_config.Encoding,  # H.264, H.265, etc.
                     'resolution': f"{encoder_config.Resolution.Width}x{encoder_config.Resolution.Height}",
                     'frame_rate': encoder_config.RateControl.FrameRateLimit,
-                    'bitrate': encoder_config.RateControl.BitrateLimit,
+                    'bitrate': encoder_config.RateControl.BitrateLimit if encoder_config.RateControl.BitrateLimit else 'Unknown',
                 })
             except Exception as encoder_error:
                 print(f"Failed to fetch encoder details for profile {profile.Name}: {encoder_error}")
