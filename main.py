@@ -55,6 +55,11 @@ def fetch_devices():
     return ipaddresses
 
 
+@app.route("/")
+def home():
+    return "<h1>Flask is running!</h1>"
+
+
 @app.route('/api/onvif-devices', methods=['GET'])
 def get_onvif_devices():
     # Fetch ONVIF device IPs
