@@ -135,7 +135,7 @@ def get_onvif_camera_data():
                     'encoder': encoder_config.Encoding,  # H.264, H.265, etc.
                     'resolution': f"{encoder_config.Resolution.Width}x{encoder_config.Resolution.Height}",
                     'frame_rate': encoder_config.RateControl.FrameRateLimit,
-                    'bitrate': encoder_config.RateControl.BitrateLimit if encoder_config.RateControl.BitrateLimit else 'Unknown',
+                    'bitrate': encoder_config.RateControl.BitrateLimit,
                 })
             except Exception as encoder_error:
                 print(f"Failed to fetch encoder details for profile {profile.Name}: {encoder_error}")
