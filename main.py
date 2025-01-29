@@ -5,6 +5,69 @@ from wsdiscovery import Scope
 import re
 from onvif import ONVIFCamera
 import logging
+from marshmallow import Schema, fields, ValidationError, validates, EXCLUDE
+# from flask_marshmallow import Marshmallow
+
+
+class CameraSchema(Schema):
+    ip = fields.String(required=True, error_messages={"required": "IP is required"})
+    username = fields.String(required=True, error_messages={"required": "Username is required"})
+    password = fields.String(required=True, error_messages={"required": "Password is required"})
+
+    class Meta:
+        unknown = EXCLUDE  # Ignore any extra fields
+
+    @validates('ip')
+    def validate_ip(self, value):
+        # Example: Validate IP format (basic check)
+        if not value.replace('.', '').isdigit():
+            raise ValidationError('Invalid IP address')
+
+    @validates('username')
+    def validate_username(self, value):
+        # Ensure username is not empty
+        if not value.strip():  # Check if the string is empty or contains only whitespace
+            raise ValidationError('Username cannot be empty')
+
+    @validates('password')
+    def validate_password(self, value):
+        # Example: Validate password length
+        if len(value) < 8:
+            raise ValidationError('Password must be at least 8 characters long')
+
+
+class PTZSchema(Schema):
+    profile_token = fields.String(required=True, error_messages={"required": "profileToken is required"})
+    pan_speed = fields.Float(required=False, missing=0.0)  # Default to 0.0 if not provided
+    tilt_speed = fields.Float(required=False, missing=0.0)  # Default to 0.0 if not provided
+    zoom_speed = fields.Float(required=False, missing=0.0)  # Default to 0.0 if not provided
+
+    class Meta:
+        unknown = EXCLUDE  # Ignore any extra fields
+
+    @validates('profile_token')
+    def validate_profile_token(self, value):
+        if not value.strip():
+            raise ValidationError('Profile token is required')
+
+    @validates('pan_speed')
+    def validate_pan_speed(self, value):
+        # Example: Validate pan_speed is within a valid range
+        if not -1.0 <= value <= 1.0:
+            raise ValidationError('panSpeed must be between -1.0 and 1.0')
+
+    @validates('tilt_speed')
+    def validate_tilt_speed(self, value):
+        # Example: Validate tilt_speed is within a valid range
+        if not -1.0 <= value <= 1.0:
+            raise ValidationError('tiltSpeed must be between -1.0 and 1.0')
+
+    @validates('zoom_speed')
+    def validate_zoom_speed(self, value):
+        # Example: Validate zoom_speed is within a valid range
+        if not -1.0 <= value <= 1.0:
+            raise ValidationError('zoomSpeed must be between -1.0 and 1.0')
+
 
 # Suppress warnings from the daemon logger
 logging.getLogger('daemon').setLevel(logging.ERROR)
@@ -13,6 +76,19 @@ app = Flask(__name__)
 
 # Enable CORS for all routes
 CORS(app)
+
+# ma = Marshmallow(app)
+
+
+# Define a default profile schema
+DEFAULT_PROFILE_SCHEMA = {
+    'name': 'Unknown',
+    'token': 'Unknown',
+    'encoder': 'Unknown',
+    'resolution': 'Unknown',
+    'frame_rate': 'Unknown',
+    'bitrate': 'Unknown',
+}
 
 
 def display(any_list):
@@ -71,16 +147,21 @@ def get_onvif_devices():
 @app.route('/api/onvif-camera-data', methods=['POST'])
 def get_onvif_camera_data():
     data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
+    # Create an instance of the schema
+    schema = CameraSchema()
 
-    if not ip:
-        return jsonify({'error': 'IP is required'}), 400
-    if not username:
-        return jsonify({'error': 'Username is required'}), 401
-    if not password:
-        return jsonify({'error': 'Password is required'}), 401
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"errors": err.messages}), 400
+
+    # If validation passes, access the validated data
+    ip = validated_data['ip']
+    username = validated_data['username']
+    password = validated_data['password']
 
     try:
         # Connect to the ONVIF camera
@@ -123,15 +204,18 @@ def get_onvif_camera_data():
 
         # Get encoder details for each profile
         profile_details = []
+
         for profile in profiles:
+            profile_data = DEFAULT_PROFILE_SCHEMA.copy()  # Create a new instance with default values
+            profile_data['name'] = profile.Name
+            profile_data['token'] = profile.token
+
             try:
                 # Get the video encoder configuration for the profile
                 encoder_config = media_service.GetVideoEncoderConfiguration({
                     'ConfigurationToken': profile.VideoEncoderConfiguration.token
                 })
-                profile_details.append({
-                    'name': profile.Name,
-                    'token': profile.token,
+                profile_data.update({  # Update only the known values
                     'encoder': encoder_config.Encoding,  # H.264, H.265, etc.
                     'resolution': f"{encoder_config.Resolution.Width}x{encoder_config.Resolution.Height}",
                     'frame_rate': encoder_config.RateControl.FrameRateLimit,
@@ -139,14 +223,8 @@ def get_onvif_camera_data():
                 })
             except Exception as encoder_error:
                 print(f"Failed to fetch encoder details for profile {profile.Name}: {encoder_error}")
-                profile_details.append({
-                    'name': profile.Name,
-                    'token': profile.token,
-                    'encoder': 'Unknown',
-                    'resolution': 'Unknown',
-                    'frame_rate': 'Unknown',
-                    'bitrate': 'Unknown',
-                })
+
+            profile_details.append(profile_data)
 
         # Return the data
         return jsonify({
@@ -175,16 +253,38 @@ def get_onvif_camera_data():
 @app.route('/api/ptz-move', methods=['POST'])
 def ptz_move():
     data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
-    profile_token = data.get('profileToken')
-    pan_speed = data.get('panSpeed', 0.0)  # Default to 0.0 if not provided
-    tilt_speed = data.get('tiltSpeed', 0.0)  # Default to 0.0 if not provided
-    zoom_speed = data.get('zoomSpeed', 0.0)  # Default to 0.0 if not provided
+    # Create an instance of the schema
+    schema = CameraSchema()
 
-    if not ip or not username or not password or not profile_token:
-        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"errors": err.messages}), 400
+
+    # If validation passes, access the validated data
+    ip = validated_data['ip']
+    username = validated_data['username']
+    password = validated_data['password']
+
+    # Create an instance of the PTZSchema
+    schema = PTZSchema()
+
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"errors": err.messages}), 400
+
+    # If validation passes, access the validated data
+    profile_token = validated_data['profile_token']
+    pan_speed = validated_data['pan_speed']
+    tilt_speed = validated_data['tilt_speed']
+    zoom_speed = validated_data['zoom_speed']
 
     try:
         # Connect to the ONVIF camera
@@ -216,13 +316,35 @@ def ptz_move():
 @app.route('/api/ptz-stop', methods=['POST'])
 def ptz_stop():
     data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
-    profile_token = data.get('profileToken')
+    # Create an instance of the schema
+    schema = CameraSchema()
 
-    if not ip or not username or not password or not profile_token:
-        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"errors": err.messages}), 400
+
+    # If validation passes, access the validated data
+    ip = validated_data['ip']
+    username = validated_data['username']
+    password = validated_data['password']
+
+    # Create an instance of the PTZSchema
+    schema = PTZSchema()
+
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"errors": err.messages}), 400
+
+    # If validation passes, access the validated data
+    profile_token = validated_data['profile_token']
 
     try:
         # Connect to the ONVIF camera
