@@ -156,7 +156,7 @@ def get_onvif_camera_data():
     except ValidationError as err:
         # Return validation errors with a 400 status code
         print(err.messages)
-        return jsonify({"errors": err.messages}), 400
+        return jsonify({"error": err.messages}), 400
 
     # If validation passes, access the validated data
     ip = validated_data['ip']
