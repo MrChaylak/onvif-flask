@@ -97,26 +97,24 @@ def display(any_list):
 
 
 def fetch_devices():
-    # Initialize WS-Discovery
-    wsd = WSDiscovery()
+    try:
+        # Initialize WS-Discovery
+        wsd = WSDiscovery()
+        scope1 = Scope("onvif://www.onvif.org/Profile")
+        wsd.start()
 
-    # Define an ONVIF scope for filtering
-    scope1 = Scope("onvif://www.onvif.org/Profile")
-    wsd.start()
+        # Search for ONVIF services
+        services = wsd.searchServices(scopes=[scope1])
 
-    # Search for ONVIF services with the defined scope
-    services = wsd.searchServices(scopes=[scope1])
-
-    # Extract device IP addresses
-    ipaddresses = []
-    for service in services:
-        # Extract IP address from XAddrs
-        xaddrs = service.getXAddrs()
-        if xaddrs:
-            ipaddress = re.search(r'(\d+\.\d+\.\d+\.\d+)', xaddrs[0])
-            if ipaddress:
-                ipaddresses.append(ipaddress.group(0))
-                # print("START----------")
+        # Extract device IP addresses
+        ipaddresses = []
+        for service in services:
+            xaddrs = service.getXAddrs()
+            if xaddrs:
+                ipaddress = re.search(r'(\d+\.\d+\.\d+\.\d+)', xaddrs[0])
+                if ipaddress:
+                    ipaddresses.append(ipaddress.group(0))
+                    # print("START----------")
                 # print(f"IP: {ipaddress.group(0)}")
 
         # Display device scopes for debugging
@@ -124,11 +122,14 @@ def fetch_devices():
         # display(service.getScopes())
         # print('------------END')
 
-    print(f'\nNumber of devices detected: {len(services)}')
+        print(f'\nNumber of devices detected: {len(services)}')
 
-    # Stop WS-Discovery
-    wsd.stop()
-    return ipaddresses
+        wsd.stop()
+        return ipaddresses
+
+    except Exception as e:
+        print(f"Error fetching devices: {e}")
+        return None  # Return None to indicate failure
 
 
 @app.route("/")
@@ -139,9 +140,15 @@ def home():
 @app.route('/api/onvif-devices', methods=['GET'])
 def get_onvif_devices():
     # Fetch ONVIF device IPs
-    devices = fetch_devices()
-    print(devices)
-    return jsonify({'devices': devices})
+    try:
+        devices = fetch_devices()
+        if devices is None:
+            return jsonify({'error': 'Failed to fetch ONVIF devices'}), 500
+        print(devices)
+        return jsonify({'devices': devices})
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
 
 
 @app.route('/api/onvif-camera-data', methods=['POST'])
