@@ -260,12 +260,38 @@ def get_onvif_camera_data():
 @app.route('/api/set-onvif-camera-profile', methods=['POST'])
 def set_onvif_camera_profile():
     data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
-    profile_token = data.get('profileToken')
-    if not ip or not username or not password or not profile_token:
-        return jsonify({'error': 'IP, username, password, and profileToken are required'}), 400
+
+    # Create an instance of the schema
+    schema = CameraSchema()
+
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"error": err.messages}), 400
+
+    # If validation passes, access the validated data
+    ip = validated_data['ip']
+    username = validated_data['username']
+    password = validated_data['password']
+
+
+    # Create an instance of the PTZSchema
+    schema = PTZSchema()
+
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"errors": err.messages}), 400
+
+    # If validation passes, access the validated data
+    profile_token = validated_data['profile_token']
+
     try:
         # Connect to the ONVIF camera
         camera = ONVIFCamera(ip, 80, username, password)
@@ -410,10 +436,24 @@ def ptz_stop():
 @app.route('/api/move-focus-continuous', methods=['POST'])
 def move_focus_continuous():
     data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
-    speed = data.get('speed', 0.5)  # Focus speed (-1.0 to 1.0)
+
+    # Create an instance of the schema
+    schema = CameraSchema()
+
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"error": err.messages}), 400
+
+    # If validation passes, access the validated data
+    ip = validated_data['ip']
+    username = validated_data['username']
+    password = validated_data['password']
+
+    focus_speed = data.get('speed', 0.5)  # Focus speed (-1.0 to 1.0)
 
     if not ip or not username or not password:
         return jsonify({'error': 'IP, username, and password are required'}), 400
@@ -428,6 +468,9 @@ def move_focus_continuous():
         # Get the video source token (required for focus control)
         media_service = camera.create_media_service()
         profiles = media_service.GetProfiles()
+
+        if not profiles:
+            raise ValueError("No ONVIF profiles found on the camera")
         video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
 
         # Move focus continuously
@@ -435,7 +478,7 @@ def move_focus_continuous():
             'VideoSourceToken': video_source_token,
             'Focus': {
                 'Continuous': {
-                    'Speed': speed
+                    'Speed': focus_speed
                 }
             }
         })
@@ -449,12 +492,22 @@ def move_focus_continuous():
 @app.route('/api/stop-focus', methods=['POST'])
 def stop_focus():
     data = request.json
-    ip = data.get('ip')
-    username = data.get('username')
-    password = data.get('password')
 
-    if not ip or not username or not password:
-        return jsonify({'error': 'IP, username, and password are required'}), 400
+    # Create an instance of the schema
+    schema = CameraSchema()
+
+    try:
+        # Validate and deserialize the input data
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        # Return validation errors with a 400 status code
+        print(err.messages)
+        return jsonify({"error": err.messages}), 400
+
+    # If validation passes, access the validated data
+    ip = validated_data['ip']
+    username = validated_data['username']
+    password = validated_data['password']
 
     try:
         # Connect to the ONVIF camera
@@ -466,6 +519,9 @@ def stop_focus():
         # Get the video source token (required for focus control)
         media_service = camera.create_media_service()
         profiles = media_service.GetProfiles()
+
+        if not profiles:
+            raise ValueError("No ONVIF profiles found on the camera")
         video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
 
         # Stop focus adjustment
