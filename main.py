@@ -48,7 +48,7 @@ class PTZSchema(Schema):
     @validates('profile_token')
     def validate_profile_token(self, value):
         if not value.strip():
-            raise ValidationError('Profile token is required')
+            raise ValidationError('profileToken is required')
 
     @validates('pan_speed')
     def validate_pan_speed(self, value):
@@ -67,6 +67,19 @@ class PTZSchema(Schema):
         # Example: Validate zoom_speed is within a valid range
         if not -1.0 <= value <= 1.0:
             raise ValidationError('zoomSpeed must be between -1.0 and 1.0')
+
+
+class FocusMoveSchema(Schema):
+    focus_speed = fields.Float(required=True, error_messages={"required": "focusSpeed is required"})  # Default to 0.0 if not provided
+
+    class Meta:
+        unknown = EXCLUDE  # Ignore any extra fields
+
+    @validates('focus_speed')
+    def validate_focus_speed(self, value):
+        # Example: Validate focus_speed is within a valid range
+        if not -1.0 <= value <= 1.0:
+            raise ValidationError('focusSpeed must be between -1.0 and 1.0')
 
 
 # Suppress warnings from the daemon logger
@@ -154,21 +167,25 @@ def get_onvif_devices():
 @app.route('/api/onvif-camera-data', methods=['POST'])
 def get_onvif_camera_data():
     data = request.json
-    # Create an instance of the schema
-    schema = CameraSchema()
+
+    errors = {}
+
+    # Create an instance of the CameraSchema
+    camera_schema = CameraSchema()
 
     try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
+        validated_camera_data = camera_schema.load(data)
     except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"error": err.messages}), 400
+        errors.update(err.messages)  # Collect errors
+
+    # If there are any errors, return them
+    if errors:
+        return jsonify({"error": errors}), 400
 
     # If validation passes, access the validated data
-    ip = validated_data['ip']
-    username = validated_data['username']
-    password = validated_data['password']
+    ip = validated_camera_data['ip']
+    username = validated_camera_data['username']
+    password = validated_camera_data['password']
 
     try:
         # Connect to the ONVIF camera
@@ -261,36 +278,32 @@ def get_onvif_camera_data():
 def set_onvif_camera_profile():
     data = request.json
 
-    # Create an instance of the schema
-    schema = CameraSchema()
+    errors = {}
 
-    try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
-    except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"error": err.messages}), 400
-
-    # If validation passes, access the validated data
-    ip = validated_data['ip']
-    username = validated_data['username']
-    password = validated_data['password']
-
-
+    # Create an instance of the CameraSchema
+    camera_schema = CameraSchema()
     # Create an instance of the PTZSchema
-    schema = PTZSchema()
+    ptz_schema = PTZSchema()
 
     try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
+        validated_camera_data = camera_schema.load(data)
     except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"errors": err.messages}), 400
+        errors.update(err.messages)  # Collect errors
+
+    try:
+        validated_ptz_data = ptz_schema.load(data)
+    except ValidationError as err:
+        errors.update(err.messages)  # Collect errors
+
+    # If there are any errors, return them
+    if errors:
+        return jsonify({"error": errors}), 400
 
     # If validation passes, access the validated data
-    profile_token = validated_data['profile_token']
+    ip = validated_camera_data['ip']
+    username = validated_camera_data['username']
+    password = validated_camera_data['password']
+    profile_token = validated_ptz_data['profile_token']
 
     try:
         # Connect to the ONVIF camera
@@ -320,38 +333,42 @@ def set_onvif_camera_profile():
 @app.route('/api/ptz-move', methods=['POST'])
 def ptz_move():
     data = request.json
-    # Create an instance of the schema
-    schema = CameraSchema()
 
-    try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
-    except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"errors": err.messages}), 400
+    errors = {}
 
-    # If validation passes, access the validated data
-    ip = validated_data['ip']
-    username = validated_data['username']
-    password = validated_data['password']
+    missing_fields = [field for field in ['pan_speed', 'tilt_speed', 'zoom_speed'] if field not in data]
 
+    if missing_fields:
+        errors["missing_fields"] = f"missing: {', '.join(missing_fields)}"
+
+
+    # Create an instance of the CameraSchema
+    camera_schema = CameraSchema()
     # Create an instance of the PTZSchema
-    schema = PTZSchema()
+    ptz_schema = PTZSchema()
 
     try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
+        validated_camera_data = camera_schema.load(data)
     except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"errors": err.messages}), 400
+        errors.update(err.messages)  # Collect errors
+
+    try:
+        validated_ptz_data = ptz_schema.load(data)
+    except ValidationError as err:
+        errors.update(err.messages)  # Collect errors
+
+    # If there are any errors, return them
+    if errors:
+        return jsonify({"error": errors}), 400
 
     # If validation passes, access the validated data
-    profile_token = validated_data['profile_token']
-    pan_speed = validated_data['pan_speed']
-    tilt_speed = validated_data['tilt_speed']
-    zoom_speed = validated_data['zoom_speed']
+    ip = validated_camera_data['ip']
+    username = validated_camera_data['username']
+    password = validated_camera_data['password']
+    profile_token = validated_ptz_data['profile_token']
+    pan_speed = validated_ptz_data['pan_speed']
+    tilt_speed = validated_ptz_data['tilt_speed']
+    zoom_speed = validated_ptz_data['zoom_speed']
 
     try:
         # Connect to the ONVIF camera
@@ -383,35 +400,33 @@ def ptz_move():
 @app.route('/api/ptz-stop', methods=['POST'])
 def ptz_stop():
     data = request.json
-    # Create an instance of the schema
-    schema = CameraSchema()
 
-    try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
-    except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"errors": err.messages}), 400
+    errors = {}
 
-    # If validation passes, access the validated data
-    ip = validated_data['ip']
-    username = validated_data['username']
-    password = validated_data['password']
-
+    # Create an instance of the CameraSchema
+    camera_schema = CameraSchema()
     # Create an instance of the PTZSchema
-    schema = PTZSchema()
+    ptz_schema = PTZSchema()
 
     try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
+        validated_camera_data = camera_schema.load(data)
     except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"errors": err.messages}), 400
+        errors.update(err.messages)  # Collect errors
+
+    try:
+        validated_ptz_data = ptz_schema.load(data)
+    except ValidationError as err:
+        errors.update(err.messages)  # Collect errors
+
+    # If there are any errors, return them
+    if errors:
+        return jsonify({"error": errors}), 400
 
     # If validation passes, access the validated data
-    profile_token = validated_data['profile_token']
+    ip = validated_camera_data['ip']
+    username = validated_camera_data['username']
+    password = validated_camera_data['password']
+    profile_token = validated_ptz_data['profile_token']
 
     try:
         # Connect to the ONVIF camera
@@ -437,26 +452,32 @@ def ptz_stop():
 def move_focus_continuous():
     data = request.json
 
-    # Create an instance of the schema
-    schema = CameraSchema()
+    errors = {}
+
+    # Create an instance of the CameraSchema
+    camera_schema = CameraSchema()
+    # Create an instance of the PTZSchema
+    focus_move_schema = FocusMoveSchema()
 
     try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
+        validated_camera_data = camera_schema.load(data)
     except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"error": err.messages}), 400
+        errors.update(err.messages)  # Collect errors
+
+    try:
+        validated_focus_move_data = focus_move_schema.load(data)
+    except ValidationError as err:
+        errors.update(err.messages)  # Collect errors
+
+    # If there are any errors, return them
+    if errors:
+        return jsonify({"error": errors}), 400
 
     # If validation passes, access the validated data
-    ip = validated_data['ip']
-    username = validated_data['username']
-    password = validated_data['password']
-
-    focus_speed = data.get('speed', 0.5)  # Focus speed (-1.0 to 1.0)
-
-    if not ip or not username or not password:
-        return jsonify({'error': 'IP, username, and password are required'}), 400
+    ip = validated_camera_data['ip']
+    username = validated_camera_data['username']
+    password = validated_camera_data['password']
+    focus_speed = validated_focus_move_data['focus_speed']
 
     try:
         # Connect to the ONVIF camera
@@ -493,21 +514,24 @@ def move_focus_continuous():
 def stop_focus():
     data = request.json
 
-    # Create an instance of the schema
-    schema = CameraSchema()
+    errors = {}
+
+    # Create an instance of the CameraSchema
+    camera_schema = CameraSchema()
 
     try:
-        # Validate and deserialize the input data
-        validated_data = schema.load(data)
+        validated_camera_data = camera_schema.load(data)
     except ValidationError as err:
-        # Return validation errors with a 400 status code
-        print(err.messages)
-        return jsonify({"error": err.messages}), 400
+        errors.update(err.messages)  # Collect errors
+
+    # If there are any errors, return them
+    if errors:
+        return jsonify({"error": errors}), 400
 
     # If validation passes, access the validated data
-    ip = validated_data['ip']
-    username = validated_data['username']
-    password = validated_data['password']
+    ip = validated_camera_data['ip']
+    username = validated_camera_data['username']
+    password = validated_camera_data['password']
 
     try:
         # Connect to the ONVIF camera
