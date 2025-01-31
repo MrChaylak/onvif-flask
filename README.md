@@ -85,7 +85,7 @@ Activate the virtual environment (if not already activated).
 To run the application use the following command:
 
 ```bash
-python main.py
+python run.py
 ```
 
 This will run the Flask app and it will be served on [http://127.0.0.1:5000](http://127.0.0.1:5000). You should see the message "Flask is running!".
