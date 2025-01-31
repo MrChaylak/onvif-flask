@@ -1,4 +1,5 @@
 from onvif import ONVIFCamera
+from app.utils.helpers import handle_onvif_error
 
 # Define a default profile schema
 DEFAULT_PROFILE_SCHEMA = {
@@ -90,13 +91,10 @@ def get_camera_data(ip, username, password):
             'system_date_time': formatted_date_time,  # Include the formatted date and time
         }
     except Exception as e:
-        # Handle specific authentication errors
-        if "Unauthorized" in str(e) or "401" in str(e):
-            print(f"Authentication failed: Incorrect username or password for camera at {ip}")
-            return {'error': 'Incorrect username or password'}, 401
-        else:
-            print(f"Error fetching ONVIF camera data: {e}")
-            return {'error': str(e)}, 500
+        print(f"Error fetching ONVIF camera data: {e}")
+        # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
+        error_message = str(e)
+        return handle_onvif_error(error_message)
 
 
 def set_camera_profile(ip, username, password, profile_token):
@@ -122,7 +120,9 @@ def set_camera_profile(ip, username, password, profile_token):
         }
     except Exception as e:
         print(f"Error fetching stream URI for profile {profile_token}: {e}")
-        return {'error': str(e)}, 500
+        # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
+        error_message = str(e)
+        return handle_onvif_error(error_message)
     
 
 def move_ptz(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_speed):
@@ -150,7 +150,9 @@ def move_ptz(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_
         return {'message': 'PTZ movement started successfully'}
     except Exception as e:
         print(f"Error performing PTZ movement: {e}")
-        return {'error': str(e)}, 500
+        # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
+        error_message = str(e)
+        return handle_onvif_error(error_message)
 
 
 def stop_ptz(ip, username, password, profile_token):
@@ -171,7 +173,9 @@ def stop_ptz(ip, username, password, profile_token):
         return {'message': 'PTZ movement stopped successfully'}
     except Exception as e:
         print(f"Error stopping PTZ movement: {e}")
-        return {'error': str(e)}, 500
+        # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
+        error_message = str(e)
+        return handle_onvif_error(error_message)
 
 
 def move_focus(ip, username, password, focus_speed):
@@ -203,7 +207,9 @@ def move_focus(ip, username, password, focus_speed):
         return {'message': 'Continuous focus adjustment started successfully'}
     except Exception as e:
         print(f"Error adjusting focus: {e}")
-        return {'error': str(e)}, 500
+        # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
+        error_message = str(e)
+        return handle_onvif_error(error_message)
 
 
 def stop_focus(ip, username, password):
@@ -230,4 +236,6 @@ def stop_focus(ip, username, password):
         return {'message': 'Focus adjustment stopped successfully'}
     except Exception as e:
         print(f"Error stopping focus: {e}")
-        return {'error': str(e)}, 500
+        # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
+        error_message = str(e)
+        return handle_onvif_error(error_message)

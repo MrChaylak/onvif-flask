@@ -1,4 +1,5 @@
 from marshmallow import Schema, fields, ValidationError, validates, EXCLUDE
+import ipaddress
 
 class CameraSchema(Schema):
     ip = fields.String(required=True, error_messages={"required": "IP is required"})
@@ -10,9 +11,10 @@ class CameraSchema(Schema):
 
     @validates('ip')
     def validate_ip(self, value):
-        # Example: Validate IP format (basic check)
-        if not value.replace('.', '').isdigit():
-            raise ValidationError('Invalid IP address')
+        try:
+            ipaddress.IPv4Address(value)  # Check if it's a valid IPv4 address
+        except ipaddress.AddressValueError:
+            raise ValidationError('Invalid IP address format. Expected a valid IPv4 address.')
 
     @validates('username')
     def validate_username(self, value):

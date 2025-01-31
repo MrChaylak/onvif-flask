@@ -24,10 +24,12 @@ def get_onvif_camera_data():
     # Call service function
     response = get_camera_data(ip, username, password)
 
-    # If an error response is returned, unpack it properly
-    if "error" in response:
-        return jsonify(response), response[1] if isinstance(response, tuple) else 500
-    
+    # Check if response contains an error
+    if isinstance(response, tuple) and "error" in response[0]:
+        # Return the error message with its associated status code
+        return jsonify(response[0]), response[1]
+
+    # If no error, return the successful response
     return jsonify(response), 200
 
 
@@ -58,7 +60,10 @@ def set_onvif_camera_profile():
     # Call service function
     response = set_camera_profile(ip, username, password, profile_token)
 
-    if "error" in response:
-        return jsonify(response), response[1] if isinstance(response, tuple) else 500
-    
+    # Check if response contains an error
+    if isinstance(response, tuple) and "error" in response[0]:
+        # Return the error message with its associated status code
+        return jsonify(response[0]), response[1]
+
+    # If no error, return the successful response
     return jsonify(response), 200

@@ -33,9 +33,13 @@ def move_focus_onvif_camera():
     
     # Call service function
     response = move_focus(ip, username, password, focus_speed)
-    if "error" in response:
-        return jsonify(response), response[1] if isinstance(response, tuple) else 500
     
+    # Check if response contains an error
+    if isinstance(response, tuple) and "error" in response[0]:
+        # Return the error message with its associated status code
+        return jsonify(response[0]), response[1]
+
+    # If no error, return the successful response
     return jsonify(response), 200
 
 
@@ -56,7 +60,11 @@ def stop_focus_onvif_camera():
 
     # Call service function
     response = stop_focus(ip, username, password)
-    if "error" in response:
-        return jsonify(response), response[1] if isinstance(response, tuple) else 500
     
+    # Check if response contains an error
+    if isinstance(response, tuple) and "error" in response[0]:
+        # Return the error message with its associated status code
+        return jsonify(response[0]), response[1]
+
+    # If no error, return the successful response
     return jsonify(response), 200
