@@ -3,13 +3,13 @@ from marshmallow import ValidationError
 from app.schemas.camera_schema import CameraSchema
 from app.schemas.profile_token_schema import ProfileTokenSchema
 from app.schemas.ptz_schema import PTZSchema
-from app.services.onvif_service import ptz_move, ptz_stop
+from app.services.onvif_service import move_ptz, stop_ptz
 
 ptz_bp = Blueprint('ptz', __name__)
 
 
 @ptz_bp.route('/move', methods=['POST'])
-def ptz_move_onvif_camera():
+def move_ptz_onvif_camera():
     data = request.json
     
     schema = CameraSchema()
@@ -44,7 +44,7 @@ def ptz_move_onvif_camera():
     zoom_speed = validated_data['zoom_speed']
 
     # Call service function
-    response = ptz_move(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_speed)
+    response = move_ptz(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_speed)
 
     if "error" in response:
         return jsonify(response), response[1] if isinstance(response, tuple) else 500
@@ -53,7 +53,7 @@ def ptz_move_onvif_camera():
 
 
 @ptz_bp.route('/stop', methods=['POST'])
-def ptz_stop_onvif_camera():
+def stop_ptz_onvif_camera():
     data = request.json
     
     schema = CameraSchema()
@@ -77,7 +77,7 @@ def ptz_stop_onvif_camera():
     profile_token = validated_data['profile_token']
 
     # Call service function
-    response = ptz_stop(ip, username, password, profile_token)
+    response = stop_ptz(ip, username, password, profile_token)
 
     if "error" in response:
         return jsonify(response), response[1] if isinstance(response, tuple) else 500

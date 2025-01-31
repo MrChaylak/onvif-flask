@@ -125,7 +125,7 @@ def set_camera_profile(ip, username, password, profile_token):
         return {'error': str(e)}, 500
     
 
-def ptz_move(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_speed):
+def move_ptz(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_speed):
     try:
         # Connect to the ONVIF camera
         camera = ONVIFCamera(ip, 80, username, password)
@@ -153,7 +153,7 @@ def ptz_move(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_
         return {'error': str(e)}, 500
 
 
-def ptz_stop(ip, username, password, profile_token):
+def stop_ptz(ip, username, password, profile_token):
     try:
         # Connect to the ONVIF camera
         camera = ONVIFCamera(ip, 80, username, password)
@@ -174,7 +174,7 @@ def ptz_stop(ip, username, password, profile_token):
         return {'error': str(e)}, 500
 
 
-def focus_move(ip, username, password, focus_speed):
+def move_focus(ip, username, password, focus_speed):
     try:
         # Connect to the ONVIF camera
         camera = ONVIFCamera(ip, 80, username, password)
@@ -203,4 +203,31 @@ def focus_move(ip, username, password, focus_speed):
         return {'message': 'Continuous focus adjustment started successfully'}
     except Exception as e:
         print(f"Error adjusting focus: {e}")
+        return {'error': str(e)}, 500
+
+
+def stop_focus(ip, username, password):
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create Imaging service
+        imaging_service = camera.create_imaging_service()
+
+        # Get the video source token (required for focus control)
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+
+        if not profiles:
+            raise ValueError("No ONVIF profiles found on the camera")
+        video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
+
+        # Stop focus adjustment
+        imaging_service.Stop({
+            'VideoSourceToken': video_source_token
+        })
+
+        return {'message': 'Focus adjustment stopped successfully'}
+    except Exception as e:
+        print(f"Error stopping focus: {e}")
         return {'error': str(e)}, 500
