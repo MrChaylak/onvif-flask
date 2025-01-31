@@ -172,3 +172,35 @@ def ptz_stop(ip, username, password, profile_token):
     except Exception as e:
         print(f"Error stopping PTZ movement: {e}")
         return {'error': str(e)}, 500
+
+
+def focus_move(ip, username, password, focus_speed):
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create Imaging service
+        imaging_service = camera.create_imaging_service()
+
+        # Get the video source token (required for focus control)
+        media_service = camera.create_media_service()
+        profiles = media_service.GetProfiles()
+
+        if not profiles:
+            raise ValueError("No ONVIF profiles found on the camera")
+        video_source_token = profiles[0].VideoSourceConfiguration.SourceToken
+
+        # Move focus continuously
+        imaging_service.Move({
+            'VideoSourceToken': video_source_token,
+            'Focus': {
+                'Continuous': {
+                    'Speed': focus_speed
+                }
+            }
+        })
+
+        return {'message': 'Continuous focus adjustment started successfully'}
+    except Exception as e:
+        print(f"Error adjusting focus: {e}")
+        return {'error': str(e)}, 500
