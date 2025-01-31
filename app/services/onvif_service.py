@@ -124,3 +124,30 @@ def set_camera_profile(ip, username, password, profile_token):
         print(f"Error fetching stream URI for profile {profile_token}: {e}")
         return {'error': str(e)}, 500
     
+
+def ptz_move(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_speed):
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create PTZ service
+        ptz_service = camera.create_ptz_service()
+
+        # Send ContinuousMove command
+        move_request = ptz_service.create_type('ContinuousMove')
+        move_request.ProfileToken = profile_token
+        move_request.Velocity = {
+            'PanTilt': {
+                'x': pan_speed,  # Pan speed (-1.0 to 1.0)
+                'y': tilt_speed  # Tilt speed (-1.0 to 1.0)
+            },
+            'Zoom': {
+                'x': zoom_speed  # Zoom speed (-1.0 to 1.0)
+            }
+        }
+        ptz_service.ContinuousMove(move_request)
+
+        return {'message': 'PTZ movement started successfully'}
+    except Exception as e:
+        print(f"Error performing PTZ movement: {e}")
+        return {'error': str(e)}, 500
