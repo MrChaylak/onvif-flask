@@ -151,3 +151,24 @@ def ptz_move(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_
     except Exception as e:
         print(f"Error performing PTZ movement: {e}")
         return {'error': str(e)}, 500
+
+
+def ptz_stop(ip, username, password, profile_token):
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+
+        # Create PTZ service
+        ptz_service = camera.create_ptz_service()
+
+        # Send Stop command
+        stop_request = ptz_service.create_type('Stop')
+        stop_request.ProfileToken = profile_token
+        stop_request.PanTilt = True  # Stop pan/tilt
+        stop_request.Zoom = True  # Stop zoom
+        ptz_service.Stop(stop_request)
+
+        return {'message': 'PTZ movement stopped successfully'}
+    except Exception as e:
+        print(f"Error stopping PTZ movement: {e}")
+        return {'error': str(e)}, 500
