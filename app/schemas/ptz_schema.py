@@ -1,18 +1,12 @@
 from marshmallow import Schema, fields, ValidationError, validates, EXCLUDE
 
 class PTZSchema(Schema):
-    profile_token = fields.String(required=True, error_messages={"required": "profileToken is required"})
-    pan_speed = fields.Float(required=False, missing=0.0)  # Default to 0.0 if not provided
-    tilt_speed = fields.Float(required=False, missing=0.0)  # Default to 0.0 if not provided
-    zoom_speed = fields.Float(required=False, missing=0.0)  # Default to 0.0 if not provided
+    pan_speed = fields.Float(required=True, error_messages={"required": "panSpeed is required"})
+    tilt_speed = fields.Float(required=True, error_messages={"required": "tiltSpeed is required"})
+    zoom_speed = fields.Float(required=True, error_messages={"required": "zoomSpeed is required"})
 
     class Meta:
         unknown = EXCLUDE  # Ignore any extra fields
-
-    @validates('profile_token')
-    def validate_profile_token(self, value):
-        if not value.strip():
-            raise ValidationError('profileToken is required')
 
     @validates('pan_speed')
     def validate_pan_speed(self, value):

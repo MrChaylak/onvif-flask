@@ -97,3 +97,30 @@ def get_camera_data(ip, username, password):
         else:
             print(f"Error fetching ONVIF camera data: {e}")
             return {'error': str(e)}, 500
+
+
+def set_camera_profile(ip, username, password, profile_token):
+    try:
+        # Connect to the ONVIF camera
+        camera = ONVIFCamera(ip, 80, username, password)
+        # Get the media service
+        media_service = camera.create_media_service()
+        # Get the stream URI for the selected profile
+        stream_uri = media_service.GetStreamUri({
+            'StreamSetup': {
+                'Stream': 'RTP-Unicast',  # Use RTP-Unicast or RTP-Multicast
+                'Transport': {
+                    'Protocol': 'RTSP'  # Use RTSP, HTTP, or HTTPS
+                }
+            },
+            'ProfileToken': profile_token,
+        })
+        print(stream_uri.Uri)
+        return {
+            'stream_uri': 'Stream URI fetched successfully',
+            # 'stream_uri': stream_uri.Uri
+        }
+    except Exception as e:
+        print(f"Error fetching stream URI for profile {profile_token}: {e}")
+        return {'error': str(e)}, 500
+    
