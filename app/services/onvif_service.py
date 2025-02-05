@@ -1,3 +1,4 @@
+import time
 from onvif import ONVIFCamera
 from app.utils.helpers import handle_onvif_error
 
@@ -133,6 +134,11 @@ def move_ptz(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_
         # Create PTZ service
         ptz_service = camera.create_ptz_service()
 
+
+        # status = ptz_service.GetStatus({'ProfileToken': profile_token})
+
+        # print(status)
+
         # Send ContinuousMove command
         move_request = ptz_service.create_type('ContinuousMove')
         move_request.ProfileToken = profile_token
@@ -146,6 +152,10 @@ def move_ptz(ip, username, password, profile_token, pan_speed, tilt_speed, zoom_
             }
         }
         ptz_service.ContinuousMove(move_request)
+
+        # status = ptz_service.GetStatus({'ProfileToken': profile_token})
+
+        # print(status)
 
         return {'message': 'PTZ movement started successfully'}
     except Exception as e:
@@ -168,9 +178,40 @@ def stop_ptz(ip, username, password, profile_token):
         stop_request.ProfileToken = profile_token
         stop_request.PanTilt = True  # Stop pan/tilt
         stop_request.Zoom = True  # Stop zoom
-        ptz_service.Stop(stop_request)
+        # ptz_service.Stop(stop_request)
 
-        return {'message': 'PTZ movement stopped successfully'}
+
+        status = ptz_service.GetStatus({'ProfileToken': profile_token})
+
+        print(status.MoveStatus.PanTilt)
+
+        max_retries=3
+        attempts = 0
+        timeout = 5 # Timeout in seconds
+        while attempts < max_retries:
+            ptz_service.Stop(stop_request)
+            start_time = time.time()
+            while time.time() - start_time <= timeout:
+                status = ptz_service.GetStatus({'ProfileToken': profile_token})
+                print("--------------------------")
+                print(status.MoveStatus.PanTilt)
+                print("--------------------------")
+                if status.MoveStatus.PanTilt == 'IDLE':
+                    return {'message': 'PTZ movement stopped successfully'}
+                time.sleep(0.5)
+            attempts += 1
+            print(f"Retrying stop command (attempt {attempts}/{max_retries})")
+        
+        status = ptz_service.GetStatus({'ProfileToken': profile_token})
+
+        print(status.MoveStatus.PanTilt)
+        
+        # If all retries fail, return error
+        return {'error': 'PTZ did not stop within the expected time after multiple attempts'}, 500
+
+        
+
+        # return {'message': 'PTZ movement stopped successfully'}
     except Exception as e:
         print(f"Error stopping PTZ movement: {e}")
         # If ONVIF error occurs, use the handle_onvif_error function to categorize and return error
